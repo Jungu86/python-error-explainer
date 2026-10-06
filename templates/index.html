@@ -1,53 +1,248 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Python 报错解释器</title>
+  <title>CodeExplainer - Python 报错解释器</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
+    :root,
+    [data-theme="light"] {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #1a1d24;
+      --text-dim: #6b7280;
+      --border: #e3e6ea;
+      --code-bg: #0d1117;
+      --code-text: #e6e6e6;
+    }
+    [data-theme="dark"] {
+      --bg: #0f1115;
+      --panel: #1e2229;
+      --text: #e6e6e6;
+      --text-dim: #9ca3af;
+      --border: #2d333b;
+      --code-bg: #0d1117;
+      --code-text: #e6e6e6;
+    }
+    * { transition: background-color 0.25s, color 0.25s, border-color 0.25s; }
     body {
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 16px;
-      font-family: system-ui, sans-serif;
-    }
-    textarea {
-      width: 100%;
-      font-family: monospace;
-      font-size: 14px;
-      padding: 10px;
-    }
-    button {
-      margin: 12px 0;
-      padding: 10px 20px;
-      cursor: pointer;
-    }
-    pre {
-      background: #f5f5f5;
-      padding: 16px;
-      white-space: pre-wrap;
-      border-radius: 8px;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 720px;
+      margin: 56px auto;
+      padding: 0 20px;
       line-height: 1.6;
     }
+    /* 主题切换开关：固定在右上角 */
+    .theme-toggle {
+      position: fixed;
+      top: 18px;
+      right: 20px;
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      z-index: 10;
+    }
+    .theme-toggle button {
+      width: auto;
+      margin: 0;
+      padding: 6px 14px;
+      background: transparent;
+      color: var(--text-dim);
+      border: none;
+      border-radius: 0;
+      font-size: 0.85rem;
+      font-weight: normal;
+    }
+    .theme-toggle button.active {
+      background: var(--code-bg);
+      color: #fff;
+    }
+    .logo {
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -1px;
+      margin-bottom: 4px;
+    }
+    .logo .mark { color: #3b82f6; }
+    .subtitle {
+      text-align: center;
+      color: var(--text-dim);
+      margin-bottom: 32px;
+      font-size: 0.95rem;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    [data-theme="dark"] .card { box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .editor-wrap {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    /* 左侧 3px 蓝色强调线：让"粘贴报错"成为第一视觉落点 */
+    .editor-wrap::before {
+      content: '';
+      display: block;
+      width: 3px;
+      height: 100%;
+      background: #3b82f6;
+      position: absolute;
+    }
+    .editor-wrap { position: relative; }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--code-bg);
+      border: none;
+      color: var(--code-text);
+      font-family: "JetBrains Mono", "Fira Code", "Courier New", monospace;
+      font-size: 14px;
+      padding: 14px 14px 14px 20px;
+      outline: none;
+      resize: vertical;
+      display: block;
+    }
+    textarea::placeholder { color: #6b7280; }
+    textarea:focus { box-shadow: inset 0 0 0 1px #3b82f6; }
+    button#btn {
+      width: 150px;
+      margin-top: 16px;
+      padding: 11px 0;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button#btn:hover { background: #2563eb; }
+    button#btn:disabled { background: #555; cursor: not-allowed; }
+    /* 回答面板：深色标题条 + 内容区，输入与回答结构分明 */
+    .answer-panel {
+      margin-top: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+    }
+    .answer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--code-bg);
+      color: #9ca3af;
+      padding: 8px 16px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.8rem;
+    }
+    .answer-header .title { color: #fff; }
+    #answer {
+      padding: 20px;
+      word-break: break-word;
+      font-size: 14px;
+    }
+    #answer.error { color: #ef4444; }
+    /* AI 回答里的代码块保持深色编辑器风格 */
+    #answer pre {
+      background: var(--code-bg);
+      color: var(--code-text);
+      padding: 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    #answer code { font-family: "JetBrains Mono", monospace; }
+    .loading {
+      display: none;
+      color: #3b82f6;
+      margin-top: 16px;
+      font-size: 0.9rem;
+      font-family: "JetBrains Mono", monospace;
+    }
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s steps(5, end) infinite;
+    }
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60% { content: '...'; }
+      80%, 100% { content: ''; }
+    }
   </style>
+<base target="_blank">
 </head>
 <body>
-  <h1>Python 报错解释器</h1>
-  <p>把完整报错信息或代码贴进来：</p>
+  <div class="theme-toggle" role="group" aria-label="背景色切换">
+    <button id="btn-light" class="active" onclick="setTheme('light')">浅色</button>
+    <button id="btn-dark" onclick="setTheme('dark')">深色</button>
+  </div>
 
-  <textarea id="q" rows="10" placeholder="Traceback (most recent call last): ..."></textarea>
-  <br>
-  <button onclick="ask()">解释一下</button>
+  <div class="logo"><span class="mark">&gt;_</span> CodeExplainer</div>
+  <p class="subtitle">本地化 Python 报错解释与修复助手</p>
 
-  <pre id="answer">等待输入...</pre>
+  <div class="card">
+    <div class="editor-wrap">
+      <textarea id="q" rows="8" placeholder="把 Python 报错信息或代码粘贴到这里..."></textarea>
+    </div>
+    <button id="btn" onclick="ask()">生成解读</button>
+    <div class="loading" id="loading">思考中</div>
+    <div class="answer-panel" id="panel">
+      <div class="answer-header">
+        <span class="title">AI 解读</span>
+        <span id="elapsed"></span>
+      </div>
+      <div id="answer"></div>
+    </div>
+  </div>
 
   <script>
+    // 主题切换：两套固定搭配（背景+文字色联动），选择存入 localStorage
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('ce-theme', theme);
+      document.getElementById('btn-light').classList.toggle('active', theme === 'light');
+      document.getElementById('btn-dark').classList.toggle('active', theme === 'dark');
+    }
+    (function initTheme() {
+      const saved = localStorage.getItem('ce-theme');
+      if (saved === 'dark') setTheme('dark');
+    })();
+
     async function ask() {
       const q = document.getElementById('q').value.trim();
+      const panelEl = document.getElementById('panel');
       const answerEl = document.getElementById('answer');
+      const elapsedEl = document.getElementById('elapsed');
+      const loadingEl = document.getElementById('loading');
+      const btnEl = document.getElementById('btn');
+
       if (!q) return;
 
-      answerEl.textContent = '思考中...';
+      panelEl.style.display = 'none';
+      answerEl.classList.remove('error');
+      loadingEl.style.display = 'block';
+      btnEl.disabled = true;
+
+      const start = performance.now();
 
       try {
         const res = await fetch('/api/ask', {
@@ -59,11 +254,21 @@
         if (!res.ok) throw new Error(await res.text());
 
         const data = await res.json();
-        answerEl.textContent = data.answer;
+        answerEl.innerHTML = marked.parse(data.answer);
       } catch (e) {
-        answerEl.textContent = '出错了：' + e.message;
+        answerEl.classList.add('error');
+        answerEl.innerHTML = '❌ 出错了：' + e.message;
+      } finally {
+        // 行为层修复：耗时显示 + 结果出现时自动滚入视野
+        elapsedEl.textContent = ((performance.now() - start) / 1000).toFixed(1) + 's';
+        loadingEl.style.display = 'none';
+        panelEl.style.display = 'block';
+        btnEl.disabled = false;
+        panelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
   </script>
 </body>
 </html>
+
+
